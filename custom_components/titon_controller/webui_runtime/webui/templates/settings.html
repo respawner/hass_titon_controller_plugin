@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Titon Controller · Settings{% endblock %}
+{% block page_id %}settings{% endblock %}
+
+{% block content %}
+<form class="card form" id="settingsForm">
+  <div class="card-header">
+    <div>
+      <h2>Controller Settings</h2>
+      <p>Adjust adaptive thresholds, quiet hours, and Home Assistant access.</p>
+    </div>
+    <button type="submit" class="btn-primary">Save Changes</button>
+  </div>
+
+  <section class="form-section">
+    <h3>Humidity Targets</h3>
+    <div class="form-grid">
+      {% for name, entity in sensor_entities %}
+      <label class="form-field">
+        <span>{{ name }}</span>
+        <input type="number" min="30" max="80" step="0.5"
+               value="{{ settings.humidity_targets[entity] }}"
+               data-sensor-target="{{ entity }}">
+        <small>Entity: <code>{{ entity }}</code></small>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h3>Auto Mode</h3>
+    <div class="form-grid">
+      <label class="form-field">
+        <span>Override Minutes</span>
+        <input type="number" min="1" max="180" step="1"
+               id="autoOverrideMinutes"
+               value="{{ settings.auto_mode.override_minutes }}">
+        <small>How long manual changes pause auto-control</small>
+      </label>
+      <label class="form-field">
+        <span>Aggressiveness</span>
+        <select id="autoAggressiveness">
+          {% for option in ['calm', 'balanced', 'aggressive'] %}
+          <option value="{{ option }}" {% if settings.auto_mode.aggressiveness == option %}selected{% endif %}>{{ option|capitalize }}</option>
+          {% endfor %}
+        </select>
+        <small>Higher = reacts faster to humidity spikes</small>
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h3>Night Quiet Hours</h3>
+    <div class="form-grid">
+      <label class="form-field checkbox-field">
+        <input type="checkbox" id="nightEnabled" {% if settings.night_quiet.enabled %}checked{% endif %}>
+        <span>Enable quiet night guard</span>
+      </label>
+      <label class="form-field">
+        <span>Quiet Start</span>
+        <input type="time" id="nightStart" value="{{ settings.night_quiet.start }}">
+      </label>
+      <label class="form-field">
+        <span>Quiet End</span>
+        <input type="time" id="nightEnd" value="{{ settings.night_quiet.end }}">
+      </label>
+      <label class="form-field">
+        <span>Max Level at Night</span>
+        <input type="number" min="1" max="4" id="nightMaxLevel" value="{{ settings.night_quiet.max_level }}">
+      </label>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <h3>Home Assistant API</h3>
+    <div class="form-grid">
+      <label class="form-field">
+        <span>Base URL</span>
+        <input type="url" id="haUrl" value="{{ settings.ha.url }}">
+      </label>
+      <label class="form-field">
+        <span>Long-Lived Token</span>
+        <input type="password" id="haToken" placeholder="••••••••" value="{{ settings.ha.token }}">
+        <small>Stored locally on the controller</small>
+      </label>
+      <label class="form-field">
+        <span>Poll Interval (sec)</span>
+        <input type="number" min="10" max="300" id="haPoll" value="{{ settings.ha.poll_seconds }}">
+      </label>
+    </div>
+  </section>
+
+  <div class="form-status" id="settingsStatus">All changes saved.</div>
+</form>
+{% endblock %}
+

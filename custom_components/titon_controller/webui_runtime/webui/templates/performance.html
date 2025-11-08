@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Titon Controller · Performance{% endblock %}
+{% block page_id %}performance{% endblock %}
+
+{% block head_scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<section class="card">
+  <div class="card-header">
+    <div>
+      <h2>Humidity & Level History</h2>
+      <p>Rolling sample from the last 24 hours. Auto-refresh every minute.</p>
+    </div>
+    <div class="chart-actions">
+      <button class="btn-secondary" data-history-window="144">Last 12h</button>
+      <button class="btn-secondary" data-history-window="288">Last 24h</button>
+      <button class="btn-secondary" data-history-window="72">Last 6h</button>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Humidity vs Targets</h3>
+      <canvas id="humidityChart" height="220"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Fan Levels</h3>
+      <canvas id="levelChart" height="220"></canvas>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block footer_scripts %}
+  <script>
+    window.performancePage = true;
+  </script>
+{% endblock %}
+
