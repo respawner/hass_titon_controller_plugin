@@ -11,6 +11,7 @@ This repository packages the Titon HRV adaptive controller as a Home Assistant c
 - **Adaptive auto-mode** – humidity learning, night quiet scheduling, manual override timers, and historical metrics are maintained automatically.
 - **Sidebar integration** – registers an iframe panel in the HA sidebar for one-click access to the UI.
 - **Persistent storage** – settings and logs are written alongside the HA configuration (paths are configurable).
+<img width="1236" height="872" alt="image" src="https://github.com/user-attachments/assets/c7185e33-c5fb-4382-a89f-f1243addc7ab" />
 
 ## Repository Layout
 
