@@ -1,0 +1,15 @@
+{
+  domain: titon_controller,
+  name: Titon Controller,
+  version: 0.1.0,
+  documentation: https://github.com/respawner/hass_titon_controller_plugin,
+  requirements: [
+    Flask==3.0.3,
+    pyserial==3.5,
+    requests==2.31.0
+  ],
+  dependencies: [],
+  codeowners: [@respawner],
+  config_flow: false,
+  iot_class: local_push
+}

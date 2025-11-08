@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Titon Controller · Logs{% endblock %}
+{% block page_id %}logs{% endblock %}
+
+{% block content %}
+<section class="card">
+  <div class="card-header">
+    <div>
+      <h2>Event Log</h2>
+      <p>Newest entries first. Auto-refreshes every 10 seconds.</p>
+    </div>
+    <button class="btn-secondary" id="refreshLogs">Refresh</button>
+  </div>
+  <div class="table-wrapper">
+    <table class="log-table">
+      <thead>
+        <tr>
+          <th>Time (UTC)</th>
+          <th>Kind</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody id="logsTable">
+        <tr><td colspan="3">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+

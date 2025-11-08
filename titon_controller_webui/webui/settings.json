@@ -1,0 +1,31 @@
+{
+  "auto_mode": {
+    "enabled": false,
+    "override_minutes": 15,
+    "aggressiveness": "balanced"
+  },
+  "night_quiet": {
+    "enabled": true,
+    "start": "21:00",
+    "end": "08:00",
+    "max_level": 2
+  },
+  "humidity_targets": {
+    "sensor.0x3425b4fffe1283bb_humidity": 55.0,
+    "sensor.miegamo_vonia_humidity": 55.0,
+    "sensor.miegamas_humidity": 55.0,
+    "sensor.jokubo_kambarys_humidity": 55.0,
+    "sensor.darbo_kambarys_humidity": 55.0
+  },
+  "ha": {
+    "url": "http://192.168.1.166:8123",
+    "token": "",
+    "timeout": 5,
+    "poll_seconds": 30
+  },
+  "learning": {
+    "adapt_rate": 0.08,
+    "max_offset": 8.0,
+    "sample_window": 12
+  }
+}

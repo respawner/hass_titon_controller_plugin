@@ -1,0 +1,7 @@
+{
+  name: Titon Controller,
+  domain: titon_controller,
+  country: lt,
+  homeassistant: 2024.6.0,
+  render_readme: true
+}

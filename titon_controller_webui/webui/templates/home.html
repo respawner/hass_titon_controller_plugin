@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Titon Controller · Home{% endblock %}
+{% block page_id %}home{% endblock %}
+
+{% block content %}
+<section class="grid cards">
+  <div class="card sensor">
+    <div class="card-icon">🏠</div>
+    <div class="card-label">Indoor Temp</div>
+    <div class="card-value" id="cardIndoorTemp">{{ sensors.indoor_temp if sensors.indoor_temp is not none else '--' }}°C</div>
+    <div class="card-subtitle">Stale intake</div>
+  </div>
+  <div class="card sensor">
+    <div class="card-icon">🌡️</div>
+    <div class="card-label">Outdoor Temp</div>
+    <div class="card-value" id="cardOutdoorTemp">{{ sensors.outdoor_temp if sensors.outdoor_temp is not none else '--' }}°C</div>
+    <div class="card-subtitle">Extract</div>
+  </div>
+  <div class="card sensor">
+    <div class="card-icon">💨</div>
+    <div class="card-label">Fresh Intake</div>
+    <div class="card-value" id="cardFreshTemp">{{ sensors.fresh_temp if sensors.fresh_temp is not none else '--' }}°C</div>
+    <div class="card-subtitle">Supply air</div>
+  </div>
+  <div class="card sensor highlight">
+    <div class="card-icon">💧</div>
+    <div class="card-label">Local Humidity</div>
+    <div class="card-value" id="cardLocalHumidity">{{ sensors.humidity if sensors.humidity is not none else '--' }}%</div>
+    <div class="card-subtitle">From Titon register</div>
+  </div>
+  <div class="card metric">
+    <div class="card-icon">📊</div>
+    <div class="card-label">Avg Humidity</div>
+    <div class="card-value" id="cardAvgHumidity">{{ metrics.avg_humidity if metrics.avg_humidity is not none else '--' }}%</div>
+    <div class="card-subtitle">Home Assistant rooms</div>
+  </div>
+  <div class="card metric">
+    <div class="card-icon">⚠️</div>
+    <div class="card-label">Max Delta</div>
+    <div class="card-value" id="cardMaxDelta">
+      {% if metrics.max_delta is not none %}{{ '%+.1f'|format(metrics.max_delta) }}%{% else %}--{% endif %}
+    </div>
+    <div class="card-subtitle">Worst room vs target</div>
+  </div>
+  <div class="card metric">
+    <div class="card-icon">⏱️</div>
+    <div class="card-label">Time In Range</div>
+    <div class="card-value" id="cardTimeInRange">
+      {% if metrics.time_in_range_pct is not none %}{{ metrics.time_in_range_pct }}%{% else %}--{% endif %}
+    </div>
+    <div class="card-subtitle">Last 24h ≤ target</div>
+  </div>
+  <div class="card metric">
+    <div class="card-icon">🛠️</div>
+    <div class="card-label">Runtime</div>
+    <div class="card-value" id="cardRuntime">
+      {% if sensors.runtime_hours is not none %}{{ (sensors.runtime_hours / 24)|round(1) }} d{% else %}--{% endif %}
+    </div>
+    <div class="card-subtitle">Cumulative</div>
+  </div>
+</section>
+
+<section class="card control">
+  <div class="control-header">
+    <div>
+      <h2>Manual Controls</h2>
+      <p>Use these for testing or rapid overrides. Auto mode pauses while overrides are active.</p>
+    </div>
+    <div class="toggles">
+      <label class="toggle">
+        <span>🤖 Auto Mode</span>
+        <input type="checkbox" id="autoToggle" {% if auto_enabled %}checked{% endif %}>
+        <span class="slider"></span>
+      </label>
+      <label class="toggle">
+        <span>🌙 Quiet Nights</span>
+        <input type="checkbox" id="nightToggle" {% if night_quiet_enabled %}checked{% endif %}>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="control-status">
+    <div>
+      <span class="label">Current Level</span>
+      <span class="value" id="currentLevelLabel">
+        {% if current_level %}Level {{ current_level }}{% elif boost_active %}Boost{% else %}Standby{% endif %}
+      </span>
+    </div>
+    <div>
+      <span class="label">Active For</span>
+      <span class="value" id="activeTimer">--</span>
+    </div>
+    <div>
+      <span class="label">Boost Inhibit</span>
+      <span class="value" id="boostInhibitLabel">{{ 'ON' if boost_inhibit else 'OFF' }}</span>
+    </div>
+    <div>
+      <span class="label">Auto Status</span>
+      <span class="value" id="autoStatusLabel">
+        {% if auto_state.reason %}{{ auto_state.reason }}{% else %}Idle{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <div class="control-buttons">
+    <button class="btn-level" data-action="level" data-level="1">Level 1<br><small>Dry & quiet</small></button>
+    <button class="btn-level" data-action="level" data-level="2">Level 2<br><small>Nominal</small></button>
+    <button class="btn-level" data-action="level" data-level="3">Level 3<br><small>Boost humidity</small></button>
+    <button class="btn-level" data-action="level" data-level="4">Level 4<br><small>Turbo</small></button>
+    <button class="btn-level danger" data-action="off">Stop<br><small>All levels</small></button>
+    <button class="btn-level focus" data-action="boost">Boost<br><small>Toggle</small></button>
+  </div>
+
+  <pre class="status-line" id="controlStatus">Ready.</pre>
+</section>
+
+<section class="card">
+  <h2>Room Humidity Snapshot</h2>
+  <div class="room-grid" id="roomHumidityGrid">
+    {% for name, entity in sensor_entities %}
+    <div class="room-card">
+      <div class="room-name">{{ name }}</div>
+      <div class="room-value" data-room-entity="{{ entity }}">--%</div>
+      <div class="room-target">Target: <span data-room-target="{{ entity }}">{{ settings.humidity_targets[entity] }}</span>%</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+
