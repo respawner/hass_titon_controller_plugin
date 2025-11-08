@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import os
+import importlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 from urllib.parse import urlparse
@@ -83,6 +84,15 @@ def _guess_panel_url(hass: HomeAssistant, host: str, port: int, explicit: Option
     return f"http://{candidate}:{port}"
 
 
+def _apply_state_provider(simple_webui, provider) -> None:
+    setter = getattr(simple_webui, "set_ha_state_provider", None)
+    if callable(setter):
+        setter(provider)
+        return
+
+    simple_webui.HA_STATE_PROVIDER = provider  # type: ignore[attr-defined]
+
+
 class TitonControllerManager:
     def __init__(self, hass: HomeAssistant, conf: Dict[str, Any]) -> None:
         self._hass = hass
@@ -103,6 +113,8 @@ class TitonControllerManager:
         os.environ["TITON_WEBUI_PORT"] = str(self.web_port)
         os.environ["TITON_SETTINGS_PATH"] = self.settings_path
         os.environ["TITON_LOG_PATH"] = self.log_path
+        bundle_root = Path(__file__).parent / "webui_runtime"
+        os.environ["TITON_WEBUI_DIR"] = str(bundle_root / "webui")
 
         settings_dir = Path(self.settings_path).parent
         log_dir = Path(self.log_path).parent
@@ -114,9 +126,12 @@ class TitonControllerManager:
         else:
             os.environ.pop("TITON_SENSOR_ENTITIES", None)
 
-        from titon_controller_webui import simple_webui
+        try:
+            from .webui_runtime import simple_webui  # type: ignore
+        except ModuleNotFoundError:
+            simple_webui = importlib.import_module("titon_controller_webui.simple_webui")  # type: ignore
 
-        simple_webui.set_ha_state_provider(_make_state_provider(self._hass))
+        _apply_state_provider(simple_webui, _make_state_provider(self._hass))
         self._server, self._server_thread = simple_webui.create_server(host=self.web_host, port=self.web_port)
         _LOGGER.info(
             "Titon controller web UI started on http://%s:%s (settings=%s)",
@@ -126,9 +141,12 @@ class TitonControllerManager:
         )
 
     def stop(self) -> None:
-        from titon_controller_webui import simple_webui
+        try:
+            from .webui_runtime import simple_webui  # type: ignore
+        except ModuleNotFoundError:
+            simple_webui = importlib.import_module("titon_controller_webui.simple_webui")  # type: ignore
 
-        simple_webui.set_ha_state_provider(None)
+        _apply_state_provider(simple_webui, None)
         if self._server is not None:
             try:
                 simple_webui.shutdown_server(self._server)

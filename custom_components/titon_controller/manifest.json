@@ -1,7 +1,7 @@
 {
   "domain": "titon_controller",
   "name": "Titon Controller",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "documentation": "https://github.com/respawner/hass_titon_controller_plugin",
   "requirements": [
     "Flask==3.0.3",
