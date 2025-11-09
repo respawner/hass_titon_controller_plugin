@@ -11,7 +11,7 @@ This integration packages the Titon HRV adaptive controller so it can run entire
 
 ## Quick Start via HACS
 1. In Home Assistant open HACS → Integrations → ⋮ → Custom repositories and add this repo (category: Integration).
-2. Search for “Titon Controller” and install it. Choose the latest release (e.g. v1.4.2). If releases are not listed, enable “Show Beta” and select the commit hash (for example fd30913).
+2. Search for “Titon Controller” and install it. Choose the latest release (e.g. v1.4.3). If releases are not listed, enable “Show Beta” and select the commit hash (for example fd30913).
 3. Restart Home Assistant so the integration loads.
 4. Add the configuration block below to configuration.yaml, then restart again.
 

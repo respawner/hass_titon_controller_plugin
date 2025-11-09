@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.3
+- Fix thread initialization race in simple_webui (ensure background workers start under lock)
+
 ## 1.4.2
 - Fall back to either the bundled or legacy titon_controller_webui module and support builds that lack set_ha_state_provider
 
