@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, time as dt_time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import serial
 from flask import Flask, jsonify, render_template, request
@@ -34,27 +35,50 @@ except ImportError:  # pragma: no cover - handled at runtime
 # Paths & constants
 # ---------------------------------------------------------------------------
 
-PORT = "/dev/ttyUSB1"
+PORT = os.environ.get("TITON_SERIAL_PORT", "/dev/ttyUSB1")
 BAUD = 1200
 
 BASE_DIR = Path(__file__).resolve().parent
-WEBUI_DIR = BASE_DIR / "webui"
+DEFAULT_WEBUI_DIR = BASE_DIR / "webui"
+WEBUI_DIR = Path(os.environ.get("TITON_WEBUI_DIR", str(DEFAULT_WEBUI_DIR)))
 TEMPLATE_DIR = WEBUI_DIR / "templates"
 STATIC_DIR = WEBUI_DIR / "static"
-LOG_PATH = WEBUI_DIR / "webui.log"
-SETTINGS_PATH = WEBUI_DIR / "settings.json"
+LOG_PATH = Path(os.environ.get("TITON_LOG_PATH", str(WEBUI_DIR / "webui.log")))
+SETTINGS_PATH = Path(os.environ.get("TITON_SETTINGS_PATH", str(WEBUI_DIR / "settings.json")))
+WEB_HOST = os.environ.get("TITON_WEBUI_HOST", "0.0.0.0")
+try:
+    WEB_PORT = int(os.environ.get("TITON_WEBUI_PORT", "8050"))
+except ValueError:
+    WEB_PORT = 8050
 
-for directory in (WEBUI_DIR, TEMPLATE_DIR, STATIC_DIR):
+for directory in (WEBUI_DIR, TEMPLATE_DIR, STATIC_DIR, LOG_PATH.parent, SETTINGS_PATH.parent):
     directory.mkdir(parents=True, exist_ok=True)
 
 # Sensor entities supplied by the user (title, entity_id)
-SENSOR_ENTITIES: List[Tuple[str, str]] = [
+DEFAULT_SENSOR_ENTITIES: List[Tuple[str, str]] = [
     ("Svetainė", "sensor.0x3425b4fffe1283bb_humidity"),
     ("Miegamo vonia", "sensor.miegamo_vonia_humidity"),
     ("Miegamasis", "sensor.miegamas_humidity"),
     ("Jokūbo kambarys", "sensor.jokubo_kambarys_humidity"),
     ("Darbo kambarys", "sensor.darbo_kambarys_humidity"),
 ]
+
+SENSOR_ENTITIES: List[Tuple[str, str]] = DEFAULT_SENSOR_ENTITIES.copy()
+ENV_SENSOR_CONFIG = os.environ.get("TITON_SENSOR_ENTITIES")
+if ENV_SENSOR_CONFIG:
+    try:
+        raw_entries = json.loads(ENV_SENSOR_CONFIG)
+        parsed: List[Tuple[str, str]] = []
+        for item in raw_entries:
+            if isinstance(item, (list, tuple)) and len(item) == 2:
+                parsed.append((str(item[0]), str(item[1])))
+            elif isinstance(item, dict) and "name" in item and "entity_id" in item:
+                parsed.append((str(item["name"]), str(item["entity_id"])))
+        if parsed:
+            SENSOR_ENTITIES = parsed
+    except Exception:
+        pass
+
 SENSOR_IDS = [entity for _, entity in SENSOR_ENTITIES]
 
 DEFAULT_TARGET = 55.0
@@ -145,6 +169,10 @@ def inject_globals() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 state_lock = threading.Lock()
+_threads_lock = threading.Lock()
+_threads_started = False
+_runtime_lock = threading.Lock()
+_runtime_started = False
 
 state: Dict[str, Any] = {
     "current_level": None,
@@ -194,6 +222,7 @@ auto_state: Dict[str, Any] = {
 }
 
 ha_session = requests.Session() if requests else None  # type: ignore
+HA_STATE_PROVIDER: Optional[Callable[[str], Optional[float]]] = None
 
 # ---------------------------------------------------------------------------
 # Logging utilities
@@ -574,7 +603,23 @@ def update_sensors_loop() -> None:
         time.sleep(60)
 
 
+def set_ha_state_provider(provider: Optional[Callable[[str], Optional[float]]]) -> None:
+    """Inject a callback that resolves Home Assistant sensor states."""
+    global HA_STATE_PROVIDER
+    HA_STATE_PROVIDER = provider
+
+
 def fetch_home_assistant_humidity() -> Dict[str, Optional[float]]:
+    if HA_STATE_PROVIDER:
+        results: Dict[str, Optional[float]] = {}
+        for _, entity in SENSOR_ENTITIES:
+            try:
+                results[entity] = HA_STATE_PROVIDER(entity)
+            except Exception as exc:  # pragma: no cover - defensive
+                results[entity] = None
+                append_log("error", "HA provider failed", {"entity": entity, "error": str(exc)})
+        return results
+
     if requests is None or not ha_session:
         return {}
 
@@ -933,9 +978,41 @@ def api_toggle_boost():
 
 
 def start_background_threads() -> None:
+    global _threads_started
+    with _threads_lock:
+        if _threads_started:
+            return
+        _threads_started = True
     threading.Thread(target=update_sensors_loop, daemon=True).start()
     threading.Thread(target=environment_monitor_loop, daemon=True).start()
     threading.Thread(target=auto_controller_loop, daemon=True).start()
+
+
+def ensure_runtime_started() -> None:
+    global _runtime_started
+    with _runtime_lock:
+        if _runtime_started:
+            return
+        enable_titon_remote_control()
+        start_background_threads()
+        _runtime_started = True
+
+
+def create_server(host: str = "0.0.0.0", port: int = 8050):
+    from werkzeug.serving import make_server
+
+    ensure_runtime_started()
+    server = make_server(host, port, app)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, thread
+
+
+def shutdown_server(server) -> None:
+    try:
+        server.shutdown()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
@@ -945,15 +1022,14 @@ if __name__ == "__main__":
     print(f"Serial Port: {PORT}")
     print(f"Baud Rate:   {BAUD}")
     print(f"WebUI Dir:   {WEBUI_DIR}")
+    print(f"Log Path:    {LOG_PATH}")
+    print(f"Settings:    {SETTINGS_PATH}")
     print("=" * 70)
 
-    enable_titon_remote_control()
-    start_background_threads()
+    ensure_runtime_started()
 
     print("=" * 70)
-    print("✅ Starting WebUI on http://0.0.0.0:8050")
-    print("🌐 Open: http://192.168.1.124:8050")
+    print(f"✅ Starting WebUI on http://{WEB_HOST}:{WEB_PORT}")
     print("=" * 70)
 
-    app.run(host="0.0.0.0", port=8050, debug=False)
-
+    app.run(host=WEB_HOST, port=WEB_PORT, debug=False, use_reloader=False)
