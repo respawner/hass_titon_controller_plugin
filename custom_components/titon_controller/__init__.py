@@ -3,31 +3,32 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import logging
 import os
-import importlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
-from urllib.parse import urlparse
 
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 
-DOMAIN = "titon_controller"
-CONF_SERIAL_PORT = "serial_port"
-CONF_WEB_HOST = "web_host"
-CONF_WEB_PORT = "web_port"
-CONF_PANEL_URL = "panel_url"
-CONF_HUMIDITY_SENSORS = "humidity_sensors"
-CONF_SETTINGS_PATH = "settings_path"
-CONF_LOG_PATH = "log_path"
-
-DEFAULT_SERIAL_PORT = "/dev/ttyUSB1"
-DEFAULT_WEB_HOST = "0.0.0.0"
-DEFAULT_WEB_PORT = 8050
-PANEL_URL_PATH = "titon-controller"
+from .const import (
+    CONF_HUMIDITY_SENSORS,
+    CONF_LOG_PATH,
+    CONF_PANEL_URL,
+    CONF_SERIAL_PORT,
+    CONF_SETTINGS_PATH,
+    CONF_WEB_HOST,
+    CONF_WEB_PORT,
+    DEFAULT_SERIAL_PORT,
+    DEFAULT_WEB_HOST,
+    DEFAULT_WEB_PORT,
+    DOMAIN,
+    PANEL_URL_PATH,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 def _prepare_sensor_payload(raw: Optional[Sequence[Dict[str, Any]]]) -> List[List[str]]:
     if not raw:
         return []
+
     prepared: List[List[str]] = []
     for item in raw:
         if not isinstance(item, dict):
@@ -78,6 +80,8 @@ def _guess_panel_url(hass: HomeAssistant, host: str, port: int, explicit: Option
     if candidate in {"0.0.0.0", "127.0.0.1"}:
         internal_url = hass.config.internal_url
         if internal_url:
+            from urllib.parse import urlparse
+
             parsed = urlparse(internal_url)
             if parsed.hostname:
                 candidate = parsed.hostname
@@ -94,18 +98,28 @@ def _apply_state_provider(simple_webui, provider) -> None:
 
 
 class TitonControllerManager:
-    def __init__(self, hass: HomeAssistant, conf: Dict[str, Any]) -> None:
+    """Runtime manager for the Titon controller web UI."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self._hass = hass
-        self._conf = conf
+        self._entry = entry
+        data = dict(entry.data)
+        options = dict(entry.options)
+
+        sensors_raw = options.get(CONF_HUMIDITY_SENSORS)
+        if sensors_raw is None:
+            sensors_raw = data.get(CONF_HUMIDITY_SENSORS)
+
+        self.sensors = _prepare_sensor_payload(sensors_raw)
+        self.serial_port = data.get(CONF_SERIAL_PORT, DEFAULT_SERIAL_PORT)
+        self.web_host = data.get(CONF_WEB_HOST, DEFAULT_WEB_HOST)
+        self.web_port = int(data.get(CONF_WEB_PORT, DEFAULT_WEB_PORT))
+        self.settings_path = data.get(CONF_SETTINGS_PATH) or hass.config.path("titon_controller_settings.json")
+        self.log_path = data.get(CONF_LOG_PATH) or hass.config.path("titon_controller_webui.log")
+        self.panel_url = _guess_panel_url(hass, self.web_host, self.web_port, data.get(CONF_PANEL_URL))
+
         self._server = None
         self._server_thread = None
-        self.serial_port = conf.get(CONF_SERIAL_PORT, DEFAULT_SERIAL_PORT)
-        self.web_host = conf.get(CONF_WEB_HOST, DEFAULT_WEB_HOST)
-        self.web_port = int(conf.get(CONF_WEB_PORT, DEFAULT_WEB_PORT))
-        self.settings_path = conf.get(CONF_SETTINGS_PATH) or hass.config.path("titon_controller_settings.json")
-        self.log_path = conf.get(CONF_LOG_PATH) or hass.config.path("titon_controller_webui.log")
-        self.sensors = _prepare_sensor_payload(conf.get(CONF_HUMIDITY_SENSORS))
-        self.panel_url = _guess_panel_url(hass, self.web_host, self.web_port, conf.get(CONF_PANEL_URL))
 
     def start(self) -> None:
         os.environ["TITON_SERIAL_PORT"] = self.serial_port
@@ -156,19 +170,29 @@ class TitonControllerManager:
         _LOGGER.info("Titon controller web UI stopped")
 
 
-def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    conf = config.get(DOMAIN)
-    if conf is None:
-        return True
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Handle integration setup via YAML or config entries."""
 
-    manager = TitonControllerManager(hass, conf)
-    hass.data[DOMAIN] = manager
+    hass.data.setdefault(DOMAIN, {})
 
-    hass.async_create_task(_async_start(hass, manager))
+    yaml_conf = config.get(DOMAIN)
+    if yaml_conf is not None:
+        hass.async_create_task(
+            hass.config_entries.flow.async_init(
+                DOMAIN,
+                context={"source": SOURCE_IMPORT},
+                data=dict(yaml_conf),
+            )
+        )
+
     return True
 
 
-async def _async_start(hass: HomeAssistant, manager: TitonControllerManager) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up Titon Controller from a config entry."""
+
+    hass.data.setdefault(DOMAIN, {})
+    manager = TitonControllerManager(hass, entry)
     await hass.async_add_executor_job(manager.start)
 
     hass.components.frontend.async_register_built_in_panel(
@@ -185,4 +209,33 @@ async def _async_start(hass: HomeAssistant, manager: TitonControllerManager) -> 
         await hass.async_add_executor_job(manager.stop)
         hass.components.frontend.async_remove_panel(PANEL_URL_PATH)
 
-    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_on_stop)
+    remove_stop = hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_on_stop)
+
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+    hass.data[DOMAIN][entry.entry_id] = {
+        "manager": manager,
+        "remove_stop": remove_stop,
+    }
+
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a Titon Controller config entry."""
+
+    stored = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    if stored:
+        remove_stop = stored.get("remove_stop")
+        if callable(remove_stop):
+            remove_stop()
+        manager: TitonControllerManager = stored["manager"]
+        await hass.async_add_executor_job(manager.stop)
+
+    hass.components.frontend.async_remove_panel(PANEL_URL_PATH)
+    return True
+
+
+async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the config entry when data or options change."""
+
+    await hass.config_entries.async_reload(entry.entry_id)

@@ -1,0 +1,34 @@
+{
+  "config": {
+    "title": "Titon Controller",
+    "step": {
+      "user": {
+        "title": "Configure Titon Controller",
+        "description": "Select the serial port, web server settings, and humidity sensors to expose in the Titon Controller UI.",
+        "data": {
+          "serial_port": "Serial port",
+          "web_host": "Web server host",
+          "web_port": "Web server port",
+          "panel_url": "Panel URL override",
+          "settings_path": "Settings file path",
+          "log_path": "Log file path",
+          "humidity_sensors": "Humidity sensors"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one Titon Controller integration can be configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Titon Controller sensors",
+        "description": "Choose which Home Assistant humidity sensors should appear as rooms in the Titon Controller panel.",
+        "data": {
+          "humidity_sensors": "Humidity sensors"
+        }
+      }
+    }
+  }
+}

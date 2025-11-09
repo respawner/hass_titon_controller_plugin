@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.0
+- Add Home Assistant config flow for guided setup
+- Allow selecting room humidity sensors from the integration options
+- Update documentation for the new UI-driven workflow
+
 ## 1.4.3
 - Fix thread initialization race in simple_webui (ensure background workers start under lock)
 
