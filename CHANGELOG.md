@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1
+- Fix panel registration for Home Assistant 2025.1+ (use frontend helper API)
+- Ensure config flow release guidance references tagged releases to avoid HACS 404s
+
 ## 2.0.0
 - Add Home Assistant config flow for guided setup
 - Allow selecting room humidity sensors from the integration options
