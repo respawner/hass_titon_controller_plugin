@@ -11,7 +11,7 @@ This integration packages the Titon HRV adaptive controller so it can run entire
 
 ## Quick Start via HACS
 1. In Home Assistant open **HACS → Integrations → ⋮ → Custom repositories** and add this repo (category: Integration).
-2. Search for **Titon Controller** and install it. Choose the latest release (e.g. v2.0.3). If releases are not listed, enable “Show Beta” and pick the newest tag (avoid selecting raw commit hashes to prevent HACS download errors).
+2. Search for **Titon Controller** and install it. Choose the latest release (e.g. v2.1.0). If releases are not listed, enable “Show Beta” and pick the newest tag (avoid selecting raw commit hashes to prevent HACS download errors).
 3. Restart Home Assistant so the integration is discovered.
 4. Go to **Settings → Devices & Services → + Add Integration**, search for **Titon Controller**, and follow the setup wizard.
 5. Open the integration’s **Options** (⋮ menu) to select which Home Assistant humidity sensors should appear as rooms in the Titon dashboard.
@@ -21,6 +21,10 @@ This integration packages the Titon HRV adaptive controller so it can run entire
 2. Copy the `titon_controller_webui` package into the same `config` directory.
 3. Ensure `Flask` and `pyserial` are installed in the Home Assistant Python environment.
 4. Restart Home Assistant, add the integration via the UI, and choose sensors through the options dialog.
+
+## Home Assistant Entities
+- `select.titon_controller_fan_speed` — choose Off or Levels 1–4 directly from Home Assistant.
+- `sensor.titon_controller_error_status` — diagnostic summary of the controller status word.
 
 ## Optional YAML Configuration
 YAML support is still available for advanced deployments. Values provided in YAML are imported into the config entry on first setup.

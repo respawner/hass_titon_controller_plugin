@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0
+- Expose Home Assistant entities for fan speed selection and controller status (no MQTT required)
+- Refresh the web UI settings page to match the integration workflow
+
 ## 2.0.3
 - Use updated config parameter names for Home Assistant frontend panel registration
 

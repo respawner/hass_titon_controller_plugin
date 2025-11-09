@@ -7,15 +7,18 @@ import importlib
 import json
 import logging
 import os
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
-from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.components import frontend
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     CONF_HUMIDITY_SENSORS,
@@ -31,6 +34,8 @@ from .const import (
     DOMAIN,
     PANEL_URL_PATH,
 )
+
+PLATFORMS: list[Platform] = [Platform.SELECT, Platform.SENSOR]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -122,6 +127,13 @@ class TitonControllerManager:
 
         self._server = None
         self._server_thread = None
+        self._simple_webui = None
+        self.device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            manufacturer="Titon",
+            model="HRV Controller",
+            name="Titon Controller",
+        )
 
     def start(self) -> None:
         os.environ["TITON_SERIAL_PORT"] = self.serial_port
@@ -147,6 +159,7 @@ class TitonControllerManager:
         except ModuleNotFoundError:
             simple_webui = importlib.import_module("titon_controller_webui.simple_webui")  # type: ignore
 
+        self._simple_webui = simple_webui
         _apply_state_provider(simple_webui, _make_state_provider(self._hass))
         self._server, self._server_thread = simple_webui.create_server(host=self.web_host, port=self.web_port)
         _LOGGER.info(
@@ -157,11 +170,12 @@ class TitonControllerManager:
         )
 
     def stop(self) -> None:
-        try:
-            from .webui_runtime import simple_webui  # type: ignore
-        except ModuleNotFoundError:
-            simple_webui = importlib.import_module("titon_controller_webui.simple_webui")  # type: ignore
-
+        simple_webui = self._simple_webui
+        if simple_webui is None:
+            try:
+                from .webui_runtime import simple_webui  # type: ignore
+            except ModuleNotFoundError:
+                simple_webui = importlib.import_module("titon_controller_webui.simple_webui")  # type: ignore
         _apply_state_provider(simple_webui, None)
         if self._server is not None:
             try:
@@ -169,7 +183,57 @@ class TitonControllerManager:
             finally:
                 self._server = None
         self._server_thread = None
+        self._simple_webui = None
         _LOGGER.info("Titon controller web UI stopped")
+
+    def is_running(self) -> bool:
+        return self._server is not None
+
+    def snapshot_state(self) -> Dict[str, Any]:
+        if not self._simple_webui:
+            raise RuntimeError("WebUI runtime is not ready")
+        return self._simple_webui.snapshot_state()
+
+    def set_fan_speed(self, option: str) -> bool:
+        if not self._simple_webui:
+            raise RuntimeError("WebUI runtime is not ready")
+
+        normalized = option.strip().lower()
+        if normalized in {"off", "0"}:
+            return self._simple_webui.turn_off_all_levels()
+
+        level_map = {
+            "1": 1,
+            "level 1": 1,
+            "2": 2,
+            "level 2": 2,
+            "3": 3,
+            "level 3": 3,
+            "4": 4,
+            "level 4": 4,
+        }
+        level = level_map.get(normalized)
+        if level is None:
+            raise ValueError(f"Unsupported fan speed option: {option}")
+
+        return self._simple_webui.apply_level_strategy(level)
+
+
+class TitonDataUpdateCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
+    def __init__(self, hass: HomeAssistant, manager: TitonControllerManager) -> None:
+        super().__init__(
+            hass,
+            _LOGGER,
+            name="Titon Controller state",
+            update_interval=timedelta(seconds=10),
+        )
+        self._manager = manager
+
+    async def _async_update_data(self) -> Dict[str, Any]:
+        try:
+            return await self.hass.async_add_executor_job(self._manager.snapshot_state)
+        except Exception as exc:
+            raise UpdateFailed(f"Failed to refresh Titon state: {exc}") from exc
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -200,6 +264,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except RuntimeError as exc:
         raise ConfigEntryNotReady(str(exc)) from exc
 
+    coordinator = TitonDataUpdateCoordinator(hass, manager)
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception as exc:
+        await hass.async_add_executor_job(manager.stop)
+        raise ConfigEntryNotReady(f"Unable to fetch initial Titon state: {exc}") from exc
+
     frontend.async_register_built_in_panel(
         hass,
         component_name="iframe",
@@ -221,8 +292,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = {
         "manager": manager,
         "remove_stop": remove_stop,
+        "coordinator": coordinator,
     }
 
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
@@ -230,15 +303,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a Titon Controller config entry."""
 
     stored = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    manager: Optional[TitonControllerManager] = None
+    remove_stop = None
     if stored:
+        manager = stored.get("manager")
         remove_stop = stored.get("remove_stop")
-        if callable(remove_stop):
-            remove_stop()
-        manager: TitonControllerManager = stored["manager"]
+
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if callable(remove_stop):
+        remove_stop()
+
+    if manager:
         await hass.async_add_executor_job(manager.stop)
 
     frontend.async_remove_panel(hass, PANEL_URL_PATH)
-    return True
+    return unload_ok
 
 
 async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
