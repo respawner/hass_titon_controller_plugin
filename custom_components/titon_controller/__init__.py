@@ -14,6 +14,7 @@ from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.components import frontend
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -194,22 +195,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})
     manager = TitonControllerManager(hass, entry)
-    await hass.async_add_executor_job(manager.start)
+    try:
+        await hass.async_add_executor_job(manager.start)
+    except RuntimeError as exc:
+        raise ConfigEntryNotReady(str(exc)) from exc
 
     frontend.async_register_built_in_panel(
         hass,
         component_name="iframe",
         sidebar_title="Titon Controller",
         sidebar_icon="mdi:fan",
-        url_path=PANEL_URL_PATH,
-        config={"url": manager.panel_url},
+        frontend_url_path=PANEL_URL_PATH,
+        data={"url": manager.panel_url},
         require_admin=False,
         update=True,
     )
 
     async def _async_on_stop(event) -> None:
         await hass.async_add_executor_job(manager.stop)
-        frontend.async_remove_panel(hass, PANEL_URL_PATH)
+        frontend.async_remove_panel(hass, frontend_url_path=PANEL_URL_PATH)
 
     remove_stop = hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_on_stop)
 
@@ -233,7 +237,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         manager: TitonControllerManager = stored["manager"]
         await hass.async_add_executor_job(manager.stop)
 
-    frontend.async_remove_panel(hass, PANEL_URL_PATH)
+    frontend.async_remove_panel(hass, frontend_url_path=PANEL_URL_PATH)
     return True
 
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2
+- Update panel registration for the latest Home Assistant APIs (use frontend_url_path)
+- Gracefully surface WebUI port-in-use errors as ConfigEntryNotReady
+
 ## 2.0.1
 - Fix panel registration for Home Assistant 2025.1+ (use frontend helper API)
 - Ensure config flow release guidance references tagged releases to avoid HACS 404s

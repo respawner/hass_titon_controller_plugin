@@ -1002,7 +1002,12 @@ def create_server(host: str = "0.0.0.0", port: int = 8050):
     from werkzeug.serving import make_server
 
     ensure_runtime_started()
-    server = make_server(host, port, app)
+    try:
+        server = make_server(host, port, app)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to bind Titon WebUI on {host}:{port}: {exc}") from exc
+    except SystemExit as exc:
+        raise RuntimeError(f"Titon WebUI server exited during startup: {exc}") from exc
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, thread
