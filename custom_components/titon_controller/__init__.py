@@ -206,14 +206,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         sidebar_title="Titon Controller",
         sidebar_icon="mdi:fan",
         frontend_url_path=PANEL_URL_PATH,
-        data={"url": manager.panel_url},
+        config={"url": manager.panel_url},
         require_admin=False,
         update=True,
     )
 
     async def _async_on_stop(event) -> None:
         await hass.async_add_executor_job(manager.stop)
-        frontend.async_remove_panel(hass, frontend_url_path=PANEL_URL_PATH)
+        frontend.async_remove_panel(hass, PANEL_URL_PATH)
 
     remove_stop = hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_on_stop)
 
@@ -237,7 +237,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         manager: TitonControllerManager = stored["manager"]
         await hass.async_add_executor_job(manager.stop)
 
-    frontend.async_remove_panel(hass, frontend_url_path=PANEL_URL_PATH)
+    frontend.async_remove_panel(hass, PANEL_URL_PATH)
     return True
 
 

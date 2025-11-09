@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.3
+- Use updated config parameter names for Home Assistant frontend panel registration
+
 ## 2.0.2
 - Update panel registration for the latest Home Assistant APIs (use frontend_url_path)
 - Gracefully surface WebUI port-in-use errors as ConfigEntryNotReady
