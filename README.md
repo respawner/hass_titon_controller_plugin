@@ -1,6 +1,9 @@
 # Titon Controller Home Assistant Integration
 
-This integration packages the Titon HRV adaptive controller so it can run entirely inside Home Assistant. It deploys the Flask dashboard, serial control logic, and background workers while exposing a sidebar panel.
+This integration packages the Titon HRV adaptive controller so it can run entirely inside Home Assistant. It deploys the Flask dashboard, serial control logic, and background workers while exposing a sidebar panel within Home Assistant.
+
+## Requirements
+This integration will require you to connect your Titon MVHR system to your home assistant instance using an RS-485 to USB adapter. 2 wires from this adapter to the controller (mounted on top of unit) are required.
 
 ## Features
 - Runs the Titon serial controller and adaptive logic directly on Home Assistant
@@ -12,9 +15,8 @@ This integration packages the Titon HRV adaptive controller so it can run entire
 ## Quick Start via HACS
 1. In Home Assistant open **HACS → Integrations → ⋮ → Custom repositories** and add this repo (category: Integration).
 2. Search for **Titon Controller** and install it. Choose the latest release (e.g. v2.1.0). If releases are not listed, enable “Show Beta” and pick the newest tag (avoid selecting raw commit hashes to prevent HACS download errors).
-3. Restart Home Assistant so the integration is discovered.
-4. Go to **Settings → Devices & Services → + Add Integration**, search for **Titon Controller**, and follow the setup wizard.
-5. Open the integration’s **Options** (⋮ menu) to select which Home Assistant humidity sensors should appear as rooms in the Titon dashboard.
+3. In Home Assistnt, go to **Settings → Devices & Services → + Add Integration**, search for **Titon Controller**, and follow the setup wizard.
+4. Open the integration’s **Options** (⋮ menu) to select which Home Assistant humidity sensors should appear as rooms in the Titon dashboard.
 
 ## Manual Installation
 1. Copy `custom_components/titon_controller` into Home Assistant’s `config/custom_components` directory.
