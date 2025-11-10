@@ -1,6 +1,8 @@
 # Titon Controller Home Assistant Integration
 
 This integration packages the Titon HRV adaptive controller so it can run entirely inside Home Assistant. It deploys the Flask dashboard, serial control logic, and background workers while exposing a sidebar panel.
+![Uploading image.png…]()
+
 
 ## Features
 - Runs the Titon serial controller and adaptive logic directly on Home Assistant
