@@ -16,7 +16,7 @@ from .const import DOMAIN
 FAN_OPTIONS = ["Off", "Level 1", "Level 2", "Level 3", "Level 4"]
 
 
-def async_setup_entry(
+async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
